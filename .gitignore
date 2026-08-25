@@ -33,6 +33,10 @@ mlartifacts/
 
 data/predictions/*.csv
 data/predictions/*.joblib
+data/raw/
+data/processed/
+data/predictions/
+data/
 
 !data/raw/
 
