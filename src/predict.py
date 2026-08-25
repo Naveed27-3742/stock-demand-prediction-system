@@ -85,6 +85,44 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+def predict_current(input_df: pd.DataFrame) -> pd.DataFrame:
+
+
+    historical_df = pd.read_csv(DATA_PATH)
+
+    input_df = input_df.copy()
+
+    input_df["Demand"] = np.nan
+
+    input_df["_prediction_row"] = True
+
+    historical_df["_prediction_row"] = False
+
+    combined_df = pd.concat([historical_df, input_df], ignore_index=True)
+
+    featured_df = create_features(combined_df)
+
+    prediction_row = featured_df[featured_df["_prediction_row"] == True].copy()
+
+    if prediction_row.empty:
+        return pd.DataFrame()
+
+    if prediction_row[NUMERICAL_FEATURES].isna().any().any():
+        return pd.DataFrame()
+
+    model, preprocessor = load_artifacts()
+
+    X = prediction_row[FEATURE_COLUMNS]
+
+    X_transformed = preprocessor.transform(X)
+
+    predictions = model.predict(X_transformed, verbose=0).flatten()
+
+    predictions = np.maximum(predictions, 0)
+
+    prediction_row["predicted_demand"] = predictions
+
+    return prediction_row
 
 def predict(df: pd.DataFrame) -> pd.DataFrame:
 

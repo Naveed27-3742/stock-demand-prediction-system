@@ -1,12 +1,7 @@
-import requests
 import streamlit as st
+import pandas as pd
 
-
-# --------------------------------------------------
-# Configuration
-# --------------------------------------------------
-
-API_URL = "http://127.0.0.1:8000"
+from src.predict import predict_current
 
 
 # --------------------------------------------------
@@ -25,33 +20,11 @@ st.set_page_config(
 # --------------------------------------------------
 
 st.title("Stock Demand Prediction")
+
 st.write(
-    "Enter the product, store, pricing, inventory, and environmental "
+    "Enter product, store, pricing, inventory, and environmental "
     "information to predict product demand."
 )
-
-
-# --------------------------------------------------
-# API Health Check
-# --------------------------------------------------
-
-try:
-    health_response = requests.get(
-        f"{API_URL}/health",
-        timeout=5,
-    )
-
-    if health_response.status_code == 200:
-        st.success("Prediction API is online")
-    else:
-        st.error("Prediction API is not responding correctly.")
-
-except requests.RequestException:
-    st.error(
-        "Cannot connect to FastAPI. "
-        "Make sure the FastAPI server is running on port 8000."
-    )
-
 
 st.divider()
 
@@ -66,53 +39,24 @@ with st.form("prediction_form"):
 
     col1, col2, col3 = st.columns(3)
 
-    # ------------------------------
-    # Basic Information
-    # ------------------------------
+    # --------------------------------------------------
+    # Product Information
+    # --------------------------------------------------
 
     with col1:
 
         st.markdown("### Product Information")
 
-        date = st.date_input(
-            "Date"
-        )
+        date = st.date_input("Date")
 
         store_id = st.selectbox(
             "Store",
-            [
-                "S001",
-                "S002",
-                "S003",
-                "S004",
-                "S005",
-            ],
+            ["S001", "S002", "S003", "S004", "S005"],
         )
 
         product_id = st.selectbox(
             "Product",
-            [
-                "P0001",
-                "P0002",
-                "P0003",
-                "P0004",
-                "P0005",
-                "P0006",
-                "P0007",
-                "P0008",
-                "P0009",
-                "P0010",
-                "P0011",
-                "P0012",
-                "P0013",
-                "P0014",
-                "P0015",
-                "P0016",
-                "P0017",
-                "P0018",
-                "P0019",
-                "P0020",
-            ],
+            [f"P{i:04d}" for i in range(1, 21)],
         )
 
         category = st.selectbox(
@@ -136,9 +80,9 @@ with st.form("prediction_form"):
             ],
         )
 
-    # ------------------------------
+    # --------------------------------------------------
     # Environmental Information
-    # ------------------------------
+    # --------------------------------------------------
 
     with col2:
 
@@ -186,9 +130,9 @@ with st.form("prediction_form"):
             step=0.01,
         )
 
-    # ------------------------------
+    # --------------------------------------------------
     # Inventory / Sales Information
-    # ------------------------------
+    # --------------------------------------------------
 
     with col3:
 
@@ -243,46 +187,49 @@ with st.form("prediction_form"):
 
 if submitted:
 
-    payload = {
-        "Date": str(date),
-
-        "Store ID": store_id,
-        "Product ID": product_id,
-
-        "Category": category,
-        "Region": region,
-        "Weather Condition": weather_condition,
-        "Seasonality": seasonality,
-
-        "Inventory Level": inventory_level,
-        "Units Sold": units_sold,
-        "Units Ordered": units_ordered,
-
-        "Price": price,
-        "Discount": discount,
-        "Promotion": promotion,
-
-        "Competitor Pricing": competitor_pricing,
-        "Epidemic": epidemic,
-    }
+    input_data = pd.DataFrame(
+        [
+            {
+                "Date": str(date),
+                "Store ID": store_id,
+                "Product ID": product_id,
+                "Category": category,
+                "Region": region,
+                "Weather Condition": weather_condition,
+                "Seasonality": seasonality,
+                "Inventory Level": inventory_level,
+                "Units Sold": units_sold,
+                "Units Ordered": units_ordered,
+                "Price": price,
+                "Discount": discount,
+                "Promotion": promotion,
+                "Competitor Pricing": competitor_pricing,
+                "Epidemic": epidemic,
+            }
+        ]
+    )
 
     try:
 
         with st.spinner("Running demand prediction..."):
 
-            response = requests.post(
-                f"{API_URL}/predict",
-                json=payload,
-                timeout=30,
+            result = predict_current(input_data)
+
+        if result.empty:
+
+            st.error(
+                "Prediction could not be generated. "
+                "The model requires historical demand data to calculate "
+                "lag and rolling-demand features."
             )
 
-        if response.status_code == 200:
+        else:
 
-            result = response.json()
+            predicted_demand = float(
+                result["predicted_demand"].iloc[0]
+            )
 
-            predicted_demand = result["predicted_demand"]
-
-            st.success("Prediction completed successfully")
+            st.success("Prediction completed successfully.")
 
             st.metric(
                 label="Predicted Demand",
@@ -294,25 +241,8 @@ if submitted:
                 f"**{predicted_demand:.0f} units** of demand."
             )
 
-        else:
+    except Exception as exc:
 
-            try:
-                error_detail = response.json().get(
-                    "detail",
-                    "Unknown API error.",
-                )
+        st.error("Prediction failed.")
 
-            except Exception:
-                error_detail = response.text
-
-            st.error(
-                f"Prediction failed: {error_detail}"
-            )
-
-    except requests.RequestException as exc:
-
-        st.error(
-            "Could not connect to the FastAPI server."
-        )
-
-        st.code(str(exc))
+        st.exception(exc)
