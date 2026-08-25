@@ -1,3 +1,9 @@
+## Live Demo
+
+[Try the live Stock Demand Prediction System](https://stock-demand-prediction-system.streamlit.app/)
+
+
+
 # Stock Demand Prediction System
 
 A production-style machine learning project for predicting product demand across multiple stores and product categories.
